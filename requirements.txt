@@ -1,0 +1,5 @@
+# dependencies
+discord.py
+
+# dev-dependencies
+pytest
