@@ -1,19 +1,12 @@
-import discord
 
-class MyClient(discord.Client):
-    async def on_ready(self):
-        print('Logged on as {0}!'.format(self.user))
-
-    async def on_message(self, message):
-        print('Message from {0.author}: {0.content}'.format(message))
+from constants import token_filename
+from MyClient import MyClient
 
 
-def get_token():
-    """Gets the Discord bot token from the assumed filename.
+def get_token(token_filename: str) -> None:
+    """Gets the Discord bot token from the given filename.
 
     File should just be the token, no other characters."""
-    token_filename = "token.txt"
-
     with open(token_filename) as f:
         return f.read()
 
@@ -21,4 +14,4 @@ def get_token():
 if __name__ == "__main__":
 
     client = MyClient()
-    client.run(get_token())
+    client.run(get_token(token_filename))
