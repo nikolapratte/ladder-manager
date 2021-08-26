@@ -1,0 +1,9 @@
+68672
+
+General:
+View Channels
+
+Text Permissions:
+Send Messages
+Read Message History
+Add Reactions
