@@ -8,7 +8,7 @@ from Command import Command
 from constants import command_names, command_symbol, debug, delete_msgs_after, timeout_limit, timeout_message
 
 
-def parse_message(message: discord.Message) -> Command:
+def parse_message(message: discord.Message) -> Optional[Command]:
     msg_str: str = message.content
     msg_str = msg_str.lower()
 
@@ -22,6 +22,9 @@ def parse_message(message: discord.Message) -> Command:
 
 class MyClient(discord.Client):
     """Queue of messages to send out. Cleared on every message sent."""
+    def __init__(self):
+        self.users_running_commands = set()
+        super().__init__()
 
     async def process_message_dm(self, message: discord.Message) -> None:
         await self.send(message.channel,
@@ -144,7 +147,7 @@ class MyClient(discord.Client):
 
     async def on_message(self, message: discord.Message) -> None:
         # ignore messages from self...
-        if message.author == self.user:
+        if message.author == self.user or message.author in self.users_running_commands:
             return
 
         print('Message from {0.author}: {0.content}'.format(message))
@@ -152,8 +155,16 @@ class MyClient(discord.Client):
         # check if DM message (or group chat) or from a server
         if message.guild is None:
             await self.process_message_dm(message)
+            return
         else:
             command: Command = parse_message(message)
+
+        # if no command matched, end
+        if command is None:
+            await self.send(message.channel, "Sorry, I don't recognize that.", delete_after = delete_msgs_after)
+        else:
+            # otherwise, add user to commands list since only one command can be run for a user at a time
+            self.users_running_commands.add(message.author)
 
         # FUTURE decide where command should go based on guild, settings, channel, etc.
         # load up appropriate database
@@ -163,3 +174,7 @@ class MyClient(discord.Client):
         # have view, model for commands.
 
         info: CommandInformation = await self.get_information(command, message)
+
+        # once done running, take user out of users running commands
+
+        self.users_running_commands.remove(message.author)
