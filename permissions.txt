@@ -1,3 +1,5 @@
+https://discord.com/api/oauth2/authorize?client_id=524713354904731648&permissions=68672&scope=bot
+
 68672
 
 General:

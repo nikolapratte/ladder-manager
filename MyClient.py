@@ -119,9 +119,9 @@ class MyClient(discord.Client):
                     break
                 await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
             
-            await explanation_msg.edit(content = f"{explanation_start}Processing match, opponent recognized as {mention_msg.author.display_name}", delete_after = delete_msgs_after)
+            await explanation_msg.edit(content = f"{explanation_start}Processing match, opponent recognized as {mention_msg.mentions[0].display_name}", delete_after = delete_msgs_after)
 
-            return ReportInformation(match_history, message.author, mention_msg.author)
+            return ReportInformation(match_history, message.author, mention_msg.mentions[0])
                 
         
         # FUTURE may need this later on
