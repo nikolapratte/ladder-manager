@@ -7,7 +7,11 @@ from CommandInformation import CommandInformation, ReportInformation
 
 
 
-command_names = {Command.report: "Report"}
+command_names = {Command.help: "Help",
+    Command.report: "Report"}
+
+# Mapping between commands and what information they need.
+# If a command doesn't need extra information, will have None.
 command_to_information = {Command.report: ReportInformation}
 command_symbol = "!"
 

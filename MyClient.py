@@ -12,8 +12,12 @@ def parse_message(message: discord.Message) -> Command:
     msg_str: str = message.content
     msg_str = msg_str.lower()
 
-    if (msg_str.startswith(f"{command_symbol}{command_names[Command.report].lower()}")):
-        return Command.report
+    # recognize each command by their name
+    for command, command_name in command_names.items():
+        command: Command
+        command_name: str
+        if msg_str.startswith(f"{command_symbol}{command_name.lower()}"):
+            return command
 
 
 class MyClient(discord.Client):
@@ -30,9 +34,14 @@ class MyClient(discord.Client):
 
 
     async def get_information(self, command: Command, message: discord.Message) -> Optional[CommandInformation]:
-        """Gets information for the provided command if extra information is needed
-        (for example, report needs score, order of matches). Returns None for
-        commands that do not need extra information (such as help)."""
+        """Gets information for the provided command if extra information is needed.
+
+        For example, report needs score, order of matches.
+        
+        Returns None for commands that do not need extra information (such as help).
+        If a command does need extra information, but this function fails to get it,
+        the function will return None. Use [command_to_information] to see if
+        a command needs extra information."""
         channel: discord.abc.Messageable = message.channel
 
         if command is Command.report:
