@@ -15,10 +15,15 @@ command_names = {Command.help: "Help",
 command_to_information = {Command.report: ReportInformation}
 command_symbol = "!"
 
-debug = True
 delete_msgs_after = 10
 
 timeout_message = "Sorry, your session timed out. Please try again."
 timeout_limit = 60
 token_filename = "token.txt"
+
+
+# dev constants
+
+debug = True
+test_db_filename = "test.db"
 
