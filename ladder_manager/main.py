@@ -1,6 +1,6 @@
 
-from constants import token_filename
-from MyClient import MyClient
+from .constants import token_filename
+from .MyClient import MyClient
 
 
 def get_token(token_filename: str) -> None:

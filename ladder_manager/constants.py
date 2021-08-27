@@ -2,8 +2,8 @@
 
 File should not contain any extra characters."""
 
-from Command import Command
-from CommandInformation import CommandInformation, ReportInformation
+from .Command import Command
+from .CommandInformation import CommandInformation, ReportInformation
 
 
 

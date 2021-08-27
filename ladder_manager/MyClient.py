@@ -1,11 +1,11 @@
-from CommandInformation import CommandInformation, ReportInformation
+from .CommandInformation import CommandInformation, ReportInformation
 import asyncio
 from typing import List, Optional, Tuple
 
 import discord
 
-from Command import Command
-from constants import command_names, command_symbol, command_to_information, \
+from .Command import Command
+from .constants import command_names, command_symbol, command_to_information, \
 debug, delete_msgs_after, timeout_limit, timeout_message
 
 
