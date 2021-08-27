@@ -5,7 +5,8 @@ from typing import List, Optional, Tuple
 import discord
 
 from Command import Command
-from constants import command_names, command_symbol, debug, delete_msgs_after, timeout_limit, timeout_message
+from constants import command_names, command_symbol, command_to_information, \
+debug, delete_msgs_after, timeout_limit, timeout_message
 
 
 def parse_message(message: discord.Message) -> Optional[Command]:
@@ -34,6 +35,24 @@ class MyClient(discord.Client):
     async def send(self, channel: discord.abc.Messageable, message: str, delete_after: float = None) -> discord.Message:
         """Sends a Discord message."""
         return await channel.send(message, delete_after = delete_after)
+
+
+    async def run_command(self, command: Command, info: CommandInformation = None) -> None:
+        """Runs the given command.
+        
+        Will raise a ValueError if not provided enough information for a command
+        that needs information."""
+        if command is Command.help:
+            pass
+
+        if command is Command.report:
+            if info is None:
+                raise ValueError("[info] should not be None for a command that requires [info].")
+            # Retype info as a [ReportInformation] now that it is known the command is for Report
+            info: ReportInformation = info
+
+            # backend stuff
+            
 
 
     async def get_information(self, command: Command, message: discord.Message) -> Optional[CommandInformation]:
@@ -111,8 +130,6 @@ class MyClient(discord.Client):
 
             # check if user reacted with one of the appropriate emojis
             def check(mention_message: discord.Message) -> bool:
-                if debug:
-                    print(f"Running check to see if user pinged opponent. Author is {mention_message.author}, mentions are {len(mention_message.mentions)}. {message.author}, {mention_message.author == message.author and len(mention_message.mentions) != 0}")
                 return mention_message.author == message.author and len(mention_message.mentions) != 0
 
             # repeat asking for user mentions until user mentions only 1 user.
@@ -162,6 +179,7 @@ class MyClient(discord.Client):
         # if no command matched, end
         if command is None:
             await self.send(message.channel, "Sorry, I don't recognize that.", delete_after = delete_msgs_after)
+            return
         else:
             # otherwise, add user to commands list since only one command can be run for a user at a time
             self.users_running_commands.add(message.author)
@@ -169,11 +187,15 @@ class MyClient(discord.Client):
         # FUTURE decide where command should go based on guild, settings, channel, etc.
         # load up appropriate database
 
-        # work with command now know its parsed
-
-        # have view, model for commands.
-
-        info: CommandInformation = await self.get_information(command, message)
+        if command_to_information[command] is not None:
+            info: CommandInformation = await self.get_information(command, message)
+            # if did not get information, end
+            if info is None:
+                return
+            else:
+                await self.run_command(command, info)
+        else:
+            await self.run_command(command)
 
         # once done running, take user out of users running commands
 
