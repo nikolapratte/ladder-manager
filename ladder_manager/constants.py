@@ -19,7 +19,7 @@ delete_msgs_after = 10
 
 timeout_message = "Sorry, your session timed out. Please try again."
 timeout_limit = 60
-token_filename = "token.txt"
+token_filename = "ladder_manager/token.txt"
 
 
 # dev constants
