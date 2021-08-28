@@ -25,17 +25,8 @@ def calculate_match(player1_mmr: int, player2_mmr: int, p1_won: bool) -> Tuple[i
             player1_mmr -= delta
             player2_mmr += delta
     else:
-        # if player2 is favored
-        diff = player2_mmr - player1_mmr
-        expectation = diff//inequality_change_rate
-        if p1_won:
-            delta = min(base_rating_change + expectation, 2 * base_rating_change)
-            player1_mmr += delta
-            player2_mmr -= delta
-        else:
-            delta = max(base_rating_change - expectation, 1)
-            player1_mmr -= delta
-            player2_mmr += delta
+        # if player2 is favored, reverse player positions
+        player2_mmr, player1_mmr = calculate_match(player2_mmr, player1_mmr, not p1_won)
 
     return player1_mmr, player2_mmr
 
