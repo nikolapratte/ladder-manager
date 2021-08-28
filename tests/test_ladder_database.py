@@ -4,7 +4,7 @@ import time
 import pytest
 
 from ..ladder_manager.LadderDB import LadderDB
-
+from ..ladder_manager.rating_calculators import base_rating_change, inequality_change_rate
 from ..ladder_manager.constants import test_db_filename
 
 @pytest.fixture
@@ -33,7 +33,6 @@ def test_database_doesnt_crash_if_exists():
     os.remove(test_db_filename)
 
 
-
 def test_player_exists(test_db: LadderDB):
     assert test_db._player_exists(124) is False
 
@@ -56,3 +55,20 @@ def test_player_get_rating(test_db: LadderDB):
 def test_player_get_rating_exception_player_does_not_exist(test_db: LadderDB):
     with pytest.raises(ValueError):
         test_db._get_player_rating(432)
+
+
+def test_process_match_simple(test_db: LadderDB):
+    test_db._create_player(1)
+    test_db._create_player(2)
+    p1output, p2output = test_db.process_match(test_db_filename, 1, 2, "111")
+
+    delta1 = base_rating_change - (0//inequality_change_rate)
+    delta2 = base_rating_change - ((0 + delta1 * 2)//inequality_change_rate)
+    delta3 = base_rating_change - ((0 + delta1 * 2 + delta2 * 2)//inequality_change_rate)
+    delta = delta1 + delta2 + delta3
+
+    assert p1output == 1200 + delta
+    assert p2output == 1200 - delta
+    
+    assert test_db._get_player_rating(1) == 1200 + delta
+    assert test_db._get_player_rating(2) == 1200 - delta
