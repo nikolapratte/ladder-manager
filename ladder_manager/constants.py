@@ -21,7 +21,7 @@ delete_msgs_after = 10
 main_ladder_name = "main_ladder.db"
 
 timeout_message = "Sorry, your session timed out. Please try again."
-timeout_limit = 60
+timeout_limit = 15
 token_filename = "ladder_manager/token.txt"
 
 

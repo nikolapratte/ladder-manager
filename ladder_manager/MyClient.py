@@ -40,6 +40,34 @@ class MyClient(discord.Client):
         """Sends a Discord message."""
         return await channel.send(message, delete_after = delete_after)
 
+    async def menu(self, message: discord.Message, user_target: discord.User, options: List[str]) -> Optional[str]:
+        """Creates a menu out of the given message.
+        
+        Expects the given user to react with one of the
+        given options (which are unicode emojis).
+        
+        Returns either the emoji the user chose or None, which means they timed out."""
+        options = ["👍", "👎", "🆗"]
+
+        # check if user reacted with one of the appropriate emojis
+        def check(reaction: discord.Reaction, user: discord.User) -> bool:
+            return user == user_target and str(reaction.emoji) in options
+
+        # put out messages and reactions on them so user can just click the reactions
+        for emoji in options:
+            await message.add_reaction(emoji)
+
+        try:
+            reaction, user = await self.wait_for("reaction_add", timeout=timeout_limit, check=check)
+            #await asyncio.gather(*[message.remove_reaction(emoji, self.user) for emoji in options])
+            for emoji in options:
+                asyncio.create_task(message.remove_reaction(emoji, self.user))
+            return reaction.emoji
+        except asyncio.TimeoutError:
+            # TODO this needs to do some extra stuff to make sure program stops running the command
+            # maybe custom exception
+            return
+
     
     def get_db(self, ladder_name: str) -> LadderDB:
         """Retrieves the db for the given ladder name. Putting this in a function
@@ -103,40 +131,29 @@ class MyClient(discord.Client):
             explanation_msg = await self.send(channel, 
             f"{explanation_start}Click on 👍 to report a win and 👎 to report a loss. Click 🆗 when you are done.")
 
-            # options the user has in the game reporting loop
-            options = ["👍", "👎", "🆗"]
-
             # list of game score messages (need for id to delete later on)
             game_score_msgs = list()
 
-            # check if user reacted with one of the appropriate emojis
-            def check(reaction: discord.Reaction, user) -> bool:
-                return user == message.author and str(reaction.emoji) in options
 
             # put out messages and reactions on them so user can just click the reactions
             while True:
                 game_score_msg: discord.Message = await self.send(channel, f"Who won game {len(match_history) + 1}?")
                 game_score_msgs.append(game_score_msg)
 
-                for emoji in options:
-                    await game_score_msg.add_reaction(emoji)
-
-                try:
-                    reaction, user = await self.wait_for("reaction_add", timeout=timeout_limit, check=check)
-                except asyncio.TimeoutError:
-                    # TODO this needs to do some extra stuff to make sure program stops running the command
-                    # maybe custom exception
-                    await self.send(channel, timeout_message)
+                choice = await self.menu(game_score_msg, message.author, ["👍", "👎", "🆗"])
+                
+                if choice is None:
+                    await self.send(message.channel, timeout_message)
+                    # clean up messages to avoid spam
+                    for bot_message in game_score_msgs:
+                        await bot_message.delete()
                     return
 
-                reaction: discord.Reaction
-                user: discord.User
-
-                if reaction.emoji == "👍":
+                if choice == "👍":
                     match_history += "1"
-                elif reaction.emoji == "👎":
+                elif choice == "👎":
                     match_history += "0"
-                elif reaction.emoji == "🆗":
+                elif choice == "🆗":
                     break
                 
             if debug:
@@ -166,8 +183,6 @@ class MyClient(discord.Client):
                     if debug:
                         print(f"Recognizing mention message as: {mention_msg.content}")
                 except asyncio.TimeoutError:
-                    # TODO this needs to do some extra stuff to make sure program stops running the command
-                    # maybe custom exception
                     await self.send(channel, timeout_message)
                     return
                 # TODO should also make sure user isn't pinging self, or bots
@@ -175,7 +190,16 @@ class MyClient(discord.Client):
                     break
                 await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
             
-            await explanation_msg.edit(content = f"{explanation_start}Processing match, opponent recognized as {mention_msg.mentions[0].display_name}", delete_after = delete_msgs_after)
+            opponent_name = mention_msg.mentions[0].display_name
+            await explanation_msg.edit(content = f"{explanation_start}Processing match, opponent recognized as {opponent_name}.\n{opponent_name} needs to verify match. 👍 to verify, 👎 to cancel.", )
+
+            choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍", "👎"])
+            if choice is None or choice == "👎":
+                await explanation_msg.edit(content = f"{opponent_name} did not verify before timeout, match report cancelled.",
+                delete_after = delete_msgs_after)
+                return
+
+            await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
 
             return ReportInformation(match_history, message.author, mention_msg.mentions[0])
                 
@@ -219,14 +243,13 @@ class MyClient(discord.Client):
 
         if command_to_information[command] is not None:
             info: CommandInformation = await self.get_information(command, message)
-            # if did not get information, end
-            if info is None:
-                return
-            else:
+            # if did not get information, skip past running command and go to cleanup section
+            if info is not None:
                 await self.run_command(ladder_name, message.channel, command, info)
         else:
             await self.run_command(ladder_name, message.channel, command)
 
         # once done running, take user out of users running commands
+        # TODO may be better to use environment (with) to ensure this is run.
 
         self.users_running_commands.remove(message.author)
