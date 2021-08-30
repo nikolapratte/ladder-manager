@@ -33,34 +33,34 @@ def test_database_doesnt_crash_if_exists():
     os.remove(test_db_filename)
 
 
-def test_player_exists(test_db: LadderDB):
-    assert test_db._player_exists(124) is False
+def testplayer_exists(test_db: LadderDB):
+    assert test_db.player_exists(124) is False
 
 
-def test_player_exists_true(test_db: LadderDB):
+def testplayer_exists_true(test_db: LadderDB):
     test_db.cur.execute("INSERT INTO players VALUES (42, 7000)")
-    assert test_db._player_exists(42) is True
+    assert test_db.player_exists(42) is True
 
 
 def test_player_create(test_db: LadderDB):
     test_db._create_player(2)
-    assert test_db._player_exists(2) is True
+    assert test_db.player_exists(2) is True
 
 
 def test_player_get_rating(test_db: LadderDB):
     test_db._create_player(3495)
-    assert test_db._get_player_rating(3495) == LadderDB.starting_rating
+    assert test_db.get_player_rating(3495) == LadderDB.starting_rating
 
 
 def test_player_get_rating_exception_player_does_not_exist(test_db: LadderDB):
     with pytest.raises(ValueError):
-        test_db._get_player_rating(432)
+        test_db.get_player_rating(432)
 
 
 def test_process_match_simple(test_db: LadderDB):
     test_db._create_player(1)
     test_db._create_player(2)
-    p1output, p2output = test_db.process_match(test_db_filename, 1, 2, "111")
+    p1output, p2output = test_db.process_match(1, 2, "111")
 
     delta1 = base_rating_change - (0//inequality_change_rate)
     delta2 = base_rating_change - ((0 + delta1 * 2)//inequality_change_rate)
@@ -70,5 +70,28 @@ def test_process_match_simple(test_db: LadderDB):
     assert p1output == 1200 + delta
     assert p2output == 1200 - delta
     
-    assert test_db._get_player_rating(1) == 1200 + delta
-    assert test_db._get_player_rating(2) == 1200 - delta
+    assert test_db.get_player_rating(1) == 1200 + delta
+    assert test_db.get_player_rating(2) == 1200 - delta
+
+
+def test_process_match_simple_save():
+    test_db = LadderDB(test_db_filename)
+
+    test_db._create_player(1)
+    test_db._create_player(2)
+    p1output, p2output = test_db.process_match(1, 2, "111")
+
+    delta1 = base_rating_change - (0//inequality_change_rate)
+    delta2 = base_rating_change - ((0 + delta1 * 2)//inequality_change_rate)
+    delta3 = base_rating_change - ((0 + delta1 * 2 + delta2 * 2)//inequality_change_rate)
+    delta = delta1 + delta2 + delta3
+
+    test_db.con.close()
+    db2 = LadderDB(test_db_filename)
+    
+    assert db2.get_player_rating(1) == 1200 + delta
+    assert db2.get_player_rating(2) == 1200 - delta
+
+    db2.con.close()
+
+    os.remove(test_db_filename)

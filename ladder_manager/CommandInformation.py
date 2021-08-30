@@ -10,7 +10,7 @@ class CommandInformation(ABC):
 
 
 class ReportInformation(CommandInformation):
-    def __init__(self, match_history: List[int], user: discord.Member, opponent: discord.Member):
+    def __init__(self, match_history: str, user: discord.User, opponent: discord.User):
         self.match_history = match_history
         self.user = user
         self.opponent = opponent

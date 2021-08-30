@@ -17,6 +17,9 @@ command_symbol = "!"
 
 delete_msgs_after = 10
 
+# will be deprecated once do db per server/channel.
+main_ladder_name = "main_ladder.db"
+
 timeout_message = "Sorry, your session timed out. Please try again."
 timeout_limit = 60
 token_filename = "ladder_manager/token.txt"

@@ -6,12 +6,16 @@ import discord
 
 from .Command import Command
 from .constants import command_names, command_symbol, command_to_information, \
-debug, delete_msgs_after, timeout_limit, timeout_message
+debug, delete_msgs_after, main_ladder_name, timeout_limit, timeout_message
+from .LadderDB import LadderDB
 
 
 def parse_message(message: discord.Message) -> Optional[Command]:
     msg_str: str = message.content
     msg_str = msg_str.lower()
+
+    if not msg_str.startswith(command_symbol):
+        return Command.not_a_command
 
     # recognize each command by their name
     for command, command_name in command_names.items():
@@ -36,23 +40,46 @@ class MyClient(discord.Client):
         """Sends a Discord message."""
         return await channel.send(message, delete_after = delete_after)
 
+    
+    def get_db(self, ladder_name: str) -> LadderDB:
+        """Retrieves the db for the given ladder name. Putting this in a function
+        allows for caching or other special things later on."""
+        return LadderDB(ladder_name)
 
-    async def run_command(self, command: Command, info: CommandInformation = None) -> None:
+
+    async def run_command(self, ladder_name: str, channel: discord.abc.Messageable,
+     command: Command, info: CommandInformation = None) -> None:
         """Runs the given command.
         
         Will raise a ValueError if not provided enough information for a command
         that needs information."""
+        assert ladder_name is not None
+        assert command is not None
+
+
         if command is Command.help:
             pass
-
-        if command is Command.report:
+        elif command is Command.report:
             if info is None:
                 raise ValueError("[info] should not be None for a command that requires [info].")
             # Retype info as a [ReportInformation] now that it is known the command is for Report
             info: ReportInformation = info
 
             # backend stuff
+            db = self.get_db(ladder_name)
             
+            p1 = info.user.id
+            p2 = info.opponent.id
+            p1_starting_mmr = db.get_player_rating(p1) if db.player_exists(p1) else LadderDB.starting_rating
+            p2_starting_mmr = db.get_player_rating(p2) if db.player_exists(p2) else LadderDB.starting_rating
+
+            p1_new_mmr, p2_new_mmr = db.process_match(p1, p2, info.match_history)
+
+            # update users on rating changes
+
+            await self.send(channel, f"""{info.user.display_name}'s rating went from {p1_starting_mmr} to {p1_new_mmr}.
+
+{info.opponent.display_name}'s rating went from {p2_starting_mmr} to {p2_new_mmr}""")
 
 
     async def get_information(self, command: Command, message: discord.Message) -> Optional[CommandInformation]:
@@ -177,7 +204,9 @@ class MyClient(discord.Client):
             command: Command = parse_message(message)
 
         # if no command matched, end
-        if command is None:
+        if command is Command.not_a_command:
+            return
+        elif command is None:
             await self.send(message.channel, "Sorry, I don't recognize that.", delete_after = delete_msgs_after)
             return
         else:
@@ -186,6 +215,7 @@ class MyClient(discord.Client):
 
         # FUTURE decide where command should go based on guild, settings, channel, etc.
         # load up appropriate database
+        ladder_name = main_ladder_name
 
         if command_to_information[command] is not None:
             info: CommandInformation = await self.get_information(command, message)
@@ -193,9 +223,9 @@ class MyClient(discord.Client):
             if info is None:
                 return
             else:
-                await self.run_command(command, info)
+                await self.run_command(ladder_name, message.channel, command, info)
         else:
-            await self.run_command(command)
+            await self.run_command(ladder_name, message.channel, command)
 
         # once done running, take user out of users running commands
 

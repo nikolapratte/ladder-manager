@@ -29,7 +29,7 @@ class LadderDB:
         # TODO can add history table later... and player statistics
 
     
-    def _player_exists(self, player: int) -> bool:
+    def player_exists(self, player: int) -> bool:
         self.cur.execute("SELECT rating FROM players WHERE id=?", (player,))
         return self.cur.fetchone() is not None
 
@@ -43,11 +43,11 @@ class LadderDB:
         """After calling this, programmer can assume the player will exist in database.
         
         If the player does not exist, make an account for them."""
-        if not self._player_exists(player):
+        if not self.player_exists(player):
             self._create_player(player)
 
     
-    def _get_player_rating(self, player: int) -> int:
+    def get_player_rating(self, player: int) -> int:
         """Retrieves the following player rating from the given ladder.
         
         Assumes that the player exists."""
@@ -60,7 +60,7 @@ class LadderDB:
         return val[0]
 
 
-    def process_match(self, ladder_name: str, player1: int, player2: int, matches: str) -> Tuple[int, int]:
+    def process_match(self, player1: int, player2: int, matches: str) -> Tuple[int, int]:
         """Processes a match in the given ladder database with the given information.
 
         [player1] and [player2] should be the ids of the players, and [matches] should be
@@ -70,8 +70,8 @@ class LadderDB:
         self._prepare_player(player1)
         self._prepare_player(player2)
 
-        p1starting_mmr = self._get_player_rating(player1)
-        p2starting_mmr = self._get_player_rating(player2)
+        p1starting_mmr = self.get_player_rating(player1)
+        p2starting_mmr = self.get_player_rating(player2)
 
         p1final_mmr, p2final_mmr = calculate_ratings(p1starting_mmr, p2starting_mmr, matches)
 
