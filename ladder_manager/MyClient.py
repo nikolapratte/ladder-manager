@@ -95,12 +95,12 @@ class MyClient(discord.Client):
             await self.send(channel, output)
         elif command is Command.leaderboard:
             db = self.get_db(ladder_name)
-            output = "LEADERBOARD"
+            output = "LEADERBOARD\n"
 
             board = db.leaderboard()
-            print(board)
             for user_id, rating in board:
-                output += f"{self.get_user(user_id)}\t{rating}\n"
+                user = await channel.guild.fetch_member(user_id)
+                output += f"{user.display_name}\t{rating}\n"
 
             await self.send(channel, output)
         elif command is Command.report:
