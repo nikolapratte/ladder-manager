@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Tuple
+from typing import List, Tuple
 
 from .rating_calculators import calculate_ratings
 
@@ -80,6 +80,12 @@ class LadderDB:
         self.con.commit()
 
         return p1final_mmr, p2final_mmr
+
+    
+    def leaderboard(self) -> List[Tuple[int, int]]:
+        """Returns a list of player ids and their rating, with the highest rating players first."""
+        self.cur.execute("SELECT id, rating FROM players ORDER BY rating DESC")
+        return self.cur.fetchall()
 
 
 if __name__ == "__main__":
