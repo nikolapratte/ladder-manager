@@ -12,9 +12,12 @@ command_alternative_names = {
     Command.help: "h"
 }
 
-command_names = {Command.help: "Help",
+command_names = {
+    Command.cancel: "Cancel",
+    Command.help: "Help",
     Command.leaderboard: "Leaderboard",
-    Command.report: "Report"}
+    Command.report: "Report"
+    }
 
 command_descriptions = {
     Command.cancel: "Cancels the current command.",

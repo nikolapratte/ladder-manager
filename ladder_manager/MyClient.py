@@ -38,6 +38,8 @@ class MyClient(discord.Client):
 
     async def send(self, channel: discord.abc.Messageable, message: str, delete_after: float = None) -> discord.Message:
         """Sends a Discord message."""
+        assert channel is not None
+
         return await channel.send(message, delete_after = delete_after)
 
     async def menu(self, message: discord.Message, user_target: discord.User, options: List[str]) -> Optional[str]:
@@ -85,6 +87,7 @@ class MyClient(discord.Client):
         that needs information."""
         assert ladder_name is not None
         assert command is not None
+        assert channel is not None
 
 
         if command is Command.help:
@@ -257,7 +260,7 @@ class MyClient(discord.Client):
         elif message.author in self.users_running_commands:
             if command is Command.cancel:
                 # TODO actual cancel by holding await object and referencing and cancelling it.
-                await self.send(message.channel, "Please wait until your last command times out, or type invalid input.")
+                await self.send(message.channel, f"Please wait until your last command times out, type invalid input, or click the {cancel_emoji} icon.")
             else:
                 await self.send(message.channel, "You can only have one command running at a time.")
             return
