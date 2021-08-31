@@ -64,8 +64,8 @@ class MyClient(discord.Client):
                 return
 
             #await asyncio.gather(*[message.remove_reaction(emoji, self.user) for emoji in options])
-            for emoji in options:
-                asyncio.create_task(message.remove_reaction(emoji, self.user))
+            #for emoji in options:
+            #    asyncio.create_task(message.remove_reaction(emoji, self.user))
             return reaction.emoji
         except asyncio.TimeoutError:
             return
@@ -137,91 +137,100 @@ class MyClient(discord.Client):
         channel: discord.abc.Messageable = message.channel
 
         if command is Command.report:
+            ### state variables
+
             # for match history, "1" means win for the author, "0" means loss for the author
             # left most refers to most recent
             match_history = ""
-
-            # explanation of the game reporting loop
-            explanation_start = f"{command_names[Command.report]} for {message.author.display_name}: "
-            explanation_msg = await self.send(channel, 
-            f"{explanation_start}Click on 👍 to report a win and 👎 to report a loss. Click 🆗 when you are done.")
+            error = False
+            game_score_cleanup = False
+            opponent = None
 
             # list of game score messages (need for id to delete later on)
             game_score_msgs = list()
 
+            ### end state variables
 
-            # put out messages and reactions on them so user can just click the reactions
+            explanation_start = f"{command_names[Command.report]} for {message.author.display_name}: "
+            explanation_msg = await self.send(channel, "Processing...")
+            
+
+            # start of declarative style. Using this for the "UI" portion of the bot,
+            # to make debugging simpler
             while True:
-                game_score_msg: discord.Message = await self.send(channel, f"Who won game {len(match_history) + 1}?")
-                game_score_msgs.append(game_score_msg)
-
-                choice = await self.menu(game_score_msg, message.author, ["👍", "👎", "🆗"])
-                
-                if choice is None:
-                    await self.send(message.channel, timeout_message)
+                if game_score_cleanup:
+                    await explanation_msg.edit(content = f"{explanation_start}Processing...")
                     # clean up messages to avoid spam
                     for bot_message in game_score_msgs:
                         await bot_message.delete()
+                    game_score_cleanup = False
+                elif error:
+                    await explanation_msg.delete()
+                    await self.send(message.channel, timeout_message)
                     return
+                elif match_history == "":
+                    await explanation_msg.edit(content = f"{explanation_start}Click on 👍 to report a win and 👎 to report a loss. Click 🆗 when you are done.")
 
-                if choice == "👍":
-                    match_history += "1"
-                elif choice == "👎":
-                    match_history += "0"
-                elif choice == "🆗":
-                    break
-                
-            if debug:
-                print(f"Match history recorded as: {match_history}.")
+                    # put out messages and reactions on them so user can just click the reactions
+                    while True:
+                        game_score_msg: discord.Message = await self.send(channel, f"Who won game {len(match_history) + 1}?")
+                        game_score_msgs.append(game_score_msg)
 
-            await explanation_msg.edit(content = f"{explanation_start}Processing...")
+                        choice = await self.menu(game_score_msg, message.author, ["👍", "👎", "🆗"])
+                        
+                        if choice is None:
+                            error = True
+                            game_score_cleanup = True
+                            break
 
-            # clean up messages to avoid spam
-            for bot_message in game_score_msgs:
-                await bot_message.delete()
-
-            # move on to asking user about opponent
-            wins = match_history.count("1")
-            losses = match_history.count("0")
-            await explanation_msg.edit(content = f"{explanation_start}Recorded {wins} wins and {losses} losses. Please ping your opponent.")
-
-            # wait for response
-
-            # check if user reacted with one of the appropriate emojis
-            def check(mention_message: discord.Message) -> bool:
-                return mention_message.author == message.author and len(mention_message.mentions) != 0
-
-            # repeat asking for user mentions until user mentions only 1 user.
-            while True:
-                try:
-                    mention_msg: discord.Message = await self.wait_for("message", timeout=timeout_limit, check=check)
+                        if choice == "👍":
+                            match_history += "1"
+                        elif choice == "👎":
+                            match_history += "0"
+                        elif choice == "🆗":
+                            break
                     if debug:
-                        print(f"Recognizing mention message as: {mention_msg.content}")
-                except asyncio.TimeoutError:
-                    await self.send(channel, timeout_message)
-                    return
-                # TODO should also make sure user isn't pinging self, or bots
-                if len(mention_msg.mentions) == 1:
-                    break
-                await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
-            
-            opponent_name = mention_msg.mentions[0].display_name
-            await explanation_msg.edit(content = f"{explanation_start}{opponent_name} needs to verify match. 👍 to verify, {cancel_emoji} to cancel.", )
+                        print(f"Match history recorded as: {match_history}.")
+                    if match_history == "":
+                        error = True
+                    game_score_cleanup = True
+                elif opponent is None:
+                    # move on to asking user about opponent
+                    wins = match_history.count("1")
+                    losses = match_history.count("0")
+                    await explanation_msg.edit(content = f"{explanation_start}Recorded {wins} wins and {losses} losses. Please ping your opponent.")
 
-            choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍"])
-            if choice is None:
-                await explanation_msg.edit(content = f"{opponent_name} did not verify before timeout, match report cancelled.",
-                delete_after = delete_msgs_after)
-                return
+                    # wait for response
+                    # check if user reacted with one of the appropriate emojis
+                    def check(mention_message: discord.Message) -> bool:
+                        return mention_message.author == message.author and len(mention_message.mentions) != 0
 
-            await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
+                    # repeat asking for user mentions until user mentions only 1 user.
+                    while True:
+                        try:
+                            mention_msg: discord.Message = await self.wait_for("message", timeout=timeout_limit, check=check)
+                            if debug:
+                                print(f"Recognizing mention message as: {mention_msg.content}")
+                        except asyncio.TimeoutError:
+                            error = True
+                            break
+                        # TODO should also make sure user isn't pinging self, or bots
+                        if len(mention_msg.mentions) == 1:
+                            opponent = mention_msg.mentions[0]
+                            break
+                        await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
+                else:
+                    opponent_name = opponent.display_name
+                    await explanation_msg.edit(content = f"{explanation_start}{opponent_name} needs to verify match. 👍 to verify, {cancel_emoji} to cancel.", )
 
-            return ReportInformation(match_history, message.author, mention_msg.mentions[0])
-                
-        
-        # FUTURE may need this later on
-        # put the reactions to wait for in this gather function
-        # results = await asyncio.gather()
+                    choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍"])
+                    if choice is None:
+                        error = True
+                        continue
+
+                    await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
+
+                    return ReportInformation(match_history, message.author, mention_msg.mentions[0])
 
 
     async def on_ready(self):
