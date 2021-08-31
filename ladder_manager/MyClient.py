@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 import discord
 
 from .Command import Command
-from .constants import command_names, command_symbol, command_to_information, \
+from .constants import cancel_emoji, command_descriptions, command_names, command_symbol, command_to_information, \
 debug, delete_msgs_after, main_ladder_name, timeout_limit, timeout_message
 from .LadderDB import LadderDB
 
@@ -46,8 +46,8 @@ class MyClient(discord.Client):
         Expects the given user to react with one of the
         given options (which are unicode emojis).
         
-        Returns either the emoji the user chose or None, which means they timed out."""
-        options = ["👍", "👎", "🆗"]
+        Returns either the emoji the user chose or None, which means they timed out or chose the cancel option."""
+        options.append(cancel_emoji)
 
         # check if user reacted with one of the appropriate emojis
         def check(reaction: discord.Reaction, user: discord.User) -> bool:
@@ -59,13 +59,15 @@ class MyClient(discord.Client):
 
         try:
             reaction, user = await self.wait_for("reaction_add", timeout=timeout_limit, check=check)
+
+            if reaction.emoji == cancel_emoji:
+                return
+
             #await asyncio.gather(*[message.remove_reaction(emoji, self.user) for emoji in options])
             for emoji in options:
                 asyncio.create_task(message.remove_reaction(emoji, self.user))
             return reaction.emoji
         except asyncio.TimeoutError:
-            # TODO this needs to do some extra stuff to make sure program stops running the command
-            # maybe custom exception
             return
 
     
@@ -86,7 +88,21 @@ class MyClient(discord.Client):
 
 
         if command is Command.help:
-            pass
+            output = ""
+            for command, name in command_names.items():
+                output += f"{name}: {command_descriptions[command]}\n"
+
+            await self.send(channel, output)
+        elif command is Command.leaderboard:
+            db = self.get_db(ladder_name)
+            output = "LEADERBOARD"
+
+            board = db.leaderboard()
+            print(board)
+            for user_id, rating in board:
+                output += f"{self.get_user(user_id)}\t{rating}\n"
+
+            await self.send(channel, output)
         elif command is Command.report:
             if info is None:
                 raise ValueError("[info] should not be None for a command that requires [info].")
@@ -106,7 +122,6 @@ class MyClient(discord.Client):
             # update users on rating changes
 
             await self.send(channel, f"""{info.user.display_name}'s rating went from {p1_starting_mmr} to {p1_new_mmr}.
-
 {info.opponent.display_name}'s rating went from {p2_starting_mmr} to {p2_new_mmr}""")
 
 
@@ -191,10 +206,10 @@ class MyClient(discord.Client):
                 await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
             
             opponent_name = mention_msg.mentions[0].display_name
-            await explanation_msg.edit(content = f"{explanation_start}Processing match, opponent recognized as {opponent_name}.\n{opponent_name} needs to verify match. 👍 to verify, 👎 to cancel.", )
+            await explanation_msg.edit(content = f"{explanation_start}{opponent_name} needs to verify match. 👍 to verify, {cancel_emoji} to cancel.", )
 
-            choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍", "👎"])
-            if choice is None or choice == "👎":
+            choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍"])
+            if choice is None:
                 await explanation_msg.edit(content = f"{opponent_name} did not verify before timeout, match report cancelled.",
                 delete_after = delete_msgs_after)
                 return
@@ -215,7 +230,7 @@ class MyClient(discord.Client):
 
     async def on_message(self, message: discord.Message) -> None:
         # ignore messages from self...
-        if message.author == self.user or message.author in self.users_running_commands:
+        if message.author == self.user:
             return
 
         print('Message from {0.author}: {0.content}'.format(message))
@@ -229,6 +244,13 @@ class MyClient(discord.Client):
 
         # if no command matched, end
         if command is Command.not_a_command:
+            return
+        elif message.author in self.users_running_commands:
+            if command is Command.cancel:
+                # TODO actual cancel by holding await object and referencing and cancelling it.
+                await self.send(message.channel, "Please wait until your last command times out, or type invalid input.")
+            else:
+                await self.send(message.channel, "You can only have one command running at a time.")
             return
         elif command is None:
             await self.send(message.channel, "Sorry, I don't recognize that.", delete_after = delete_msgs_after)
