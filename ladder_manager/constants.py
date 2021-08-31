@@ -49,4 +49,4 @@ token_filename = "ladder_manager/token.txt"
 
 debug = True
 test_db_filename = "test.db"
-
+server_db_name = "ladder_server.db"

@@ -8,6 +8,7 @@ from .Command import Command
 from .constants import cancel_emoji, command_descriptions, command_names, command_symbol, command_to_information, \
 debug, delete_msgs_after, main_ladder_name, timeout_limit, timeout_message
 from .LadderDB import LadderDB
+from .ServerDB import ServerDB
 
 
 def parse_message(message: discord.Message) -> Optional[Command]:
@@ -29,6 +30,7 @@ class MyClient(discord.Client):
     """Queue of messages to send out. Cleared on every message sent."""
     def __init__(self):
         self.users_running_commands = set()
+        self.server_db = ServerDB()
         super().__init__()
 
     async def process_message_dm(self, message: discord.Message) -> None:
@@ -77,6 +79,28 @@ class MyClient(discord.Client):
         """Retrieves the db for the given ladder name. Putting this in a function
         allows for caching or other special things later on."""
         return LadderDB(ladder_name)
+
+
+    async def setup_guild(self, guild: discord.Guild) -> None:
+        """Makes users with "Manage Server" permission administrators for the bot."""
+        # TODO untested
+        assert type(guild) is discord.Guild
+
+        # get roles that have "Manage Server" permission 
+        admin_roles = set()
+        for role in guild.roles:
+            role: discord.Role = role
+            if role.permissions.manage_guild:
+                admin_roles.add(role)
+
+        for member in guild.members:
+            member: discord.Member = member
+            for role in member.roles:
+                if role in admin_roles:
+                    if debug:
+                        print(f"Making user {member.display_name} an administrator of guild {guild.name}.")
+                    self.server_db.add_admin(member.id, guild.id)
+
 
 
     async def run_command(self, ladder_name: str, channel: discord.abc.Messageable,
@@ -252,6 +276,11 @@ class MyClient(discord.Client):
             await self.process_message_dm(message)
             return
         else:
+            # figure out guild, perform setup if necessary
+            if not self.server_db.is_guild_registered(message.channel.guild):
+                self.setup_guild(message.channel.guild)
+
+            # save guild info, load up necessary info
             command: Command = parse_message(message)
 
         # if no command matched, end

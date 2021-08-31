@@ -112,3 +112,14 @@ def test_leaderboard2(test_db: LadderDB):
     p1output, p2output = test_db.process_match(1, 2, "111")
 
     assert test_db.leaderboard() == [(1, p1output), (3, LadderDB.starting_rating), (2, p2output)]
+
+
+def test_history(test_db: LadderDB):
+    test_db._create_player(1)
+    test_db._create_player(2)
+    p1output, p2output = test_db.process_match(1, 2, "111")
+
+    test_db.cur.execute("SELECT * FROM history")
+    values = test_db.cur.fetchone()
+
+    assert values == (1, 2, 1200, 1200, "111")

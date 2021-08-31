@@ -4,10 +4,12 @@ from typing import List, Tuple
 from .rating_calculators import calculate_ratings
 
 class LadderDB:
+    """Database for the ladder. Stores player information."""
+
     players_table = "players"
     starting_rating = 1200
 
-    """Database for the ladder. Stores player information."""
+    
     def __init__(self, ladder_name: str) -> None:
         """Sets up a new ladder database, using the provided filename.
         
@@ -24,9 +26,10 @@ class LadderDB:
             # run setup, since this is first time loading database for this ladder
             self.cur.execute(f"""CREATE TABLE {LadderDB.players_table}
                             (id integer, rating integer)""")
+            self.cur.execute(f"""CREATE TABLE history
+            (p1 integer, p2 integer, p1rating integer, p2rating integer, matches text)""")
 
         self.con.commit()
-        # TODO can add history table later... and player statistics
 
     
     def player_exists(self, player: int) -> bool:
@@ -37,6 +40,7 @@ class LadderDB:
     def _create_player(self, player: int) -> None:
         """Creates a player account"""
         self.cur.execute(f"INSERT INTO players VALUES (?, {LadderDB.starting_rating})", (player,))
+        self.con.commit()
 
     
     def _prepare_player(self, player: int) -> None:
@@ -72,6 +76,8 @@ class LadderDB:
 
         p1starting_mmr = self.get_player_rating(player1)
         p2starting_mmr = self.get_player_rating(player2)
+
+        self.cur.execute("INSERT INTO history VALUES (?, ?, ?, ?, ?)", (player1, player2, p1starting_mmr, p2starting_mmr, matches))
 
         p1final_mmr, p2final_mmr = calculate_ratings(p1starting_mmr, p2starting_mmr, matches)
 
