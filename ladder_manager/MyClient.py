@@ -1,4 +1,4 @@
-from .CommandInformation import CommandInformation, ReportInformation
+from .CommandInformation import CommandInformation, ReportInformation, SetInformation
 import asyncio
 from typing import Callable, List, Optional, Tuple, final
 
@@ -159,9 +159,6 @@ class MyClient(discord.Client):
                 output += f"{name}: {command_descriptions[command]}\n"
 
             await self.send(channel, output)
-        elif command is Command.update_admins:
-            await self.setup_guild(channel.guild)
-            await self.send(channel, "Processing update_admins request...", delete_after = delete_msgs_after)
         elif command is Command.leaderboard:
             db = self.get_db(ladder_name)
             output = "LEADERBOARD\n"
@@ -172,6 +169,14 @@ class MyClient(discord.Client):
                 output += f"{user.display_name}\t{rating}\n"
 
             await self.send(channel, output)
+        elif command is Command.set:
+            assert info is not None
+            info: SetInformation = info
+
+            db = self.get_db(ladder_name)
+            db.update_player(info.user_id, info.rating)
+
+            await self.send(channel, "Updated player rating.")
         elif command is Command.report:
             if info is None:
                 raise ValueError("[info] should not be None for a command that requires [info].")
@@ -205,7 +210,59 @@ class MyClient(discord.Client):
         a command needs extra information."""
         channel: discord.abc.Messageable = message.channel
 
-        if command is Command.report:
+        if command is Command.set:
+            # states
+            error = False
+            user_target: int = None
+            rating: int = None
+
+            explanation_start = f"{command_names[Command.set]} for {message.author.display_name}: "
+            explanation_msg = await self.send(channel, f"{explanation_start}Processing...")
+
+            while True:
+                if error:
+                    await explanation_msg.delete()
+                    await self.send(message.channel, timeout_message)
+                    return
+                elif user_target is None:
+                    await explanation_msg.edit(content=f"{explanation_start}Mention the user whose rating you would like to set.")
+
+                    val = await self.request_info(message.author,
+                            lambda x: len(x.mentions) == 1 and x.mentions[0].bot is False, 
+                            "Only mention 1 user.")
+
+                    if val is None:
+                        error = True
+                        continue
+                    else:
+                        user_target = val.mentions[0].id
+                elif rating is None:
+                    await explanation_msg.edit(content=f"{explanation_start}Type a rating.")
+
+                    def check(message: discord.Message) -> bool:
+                        try:
+                            val = int(message.content)
+                            if 0 <= val <= 100000:
+                                return True
+                        except ValueError:
+                            pass
+                        return False
+
+                    val = await self.request_info(message.author,
+                            check, 
+                            "Type a rating between 0 and 100000.")
+
+                    if val is None:
+                        error = True
+                        continue
+                    else:
+                        rating = int(val.content)
+                else:
+                    await self.send(message.channel, f"Changing user's rating...", delete_after= delete_msgs_after)
+                    if debug:
+                        print(f"Sending user id: {user_target} with rating {rating}.")
+                    return SetInformation(user_id = user_target, rating = rating)
+        elif command is Command.report:
             ### state variables
 
             # for match history, "1" means win for the author, "0" means loss for the author
@@ -289,9 +346,6 @@ class MyClient(discord.Client):
                     await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
 
                     return ReportInformation(match_history, message.author, opponent)
-        elif command is Command.set:
-            # TODO current
-            pass
 
 
     async def on_ready(self):
@@ -313,7 +367,8 @@ class MyClient(discord.Client):
             # add user to admin list if they are an admin
             # this is an inefficient alternative to just adding users once when added
             # to a server, but don't want to enable privileged intents right now
-            if message.author.guild_permissions.manage_guild:
+            if message.author.guild_permissions.manage_guild and\
+            not self.server_db.is_admin(message.channel.guild.id, message.author.id):
                 print(f"Making user [{message.author.display_name}] an administrator of guild [{message.channel.guild.name}].")
                 self.server_db.add_admin(message.channel.guild.id, message.author.id)
 

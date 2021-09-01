@@ -63,6 +63,13 @@ class LadderDB:
 
         return val[0]
 
+    def update_player(self, player: int, rating: int) -> None:
+        """Updates the given player with the given rating."""
+        if not self.player_exists(player):
+            self._create_player(player)
+        self.cur.execute("UPDATE players SET rating = ? WHERE id = ?", (rating, player))
+        self.con.commit()
+
 
     def process_match(self, player1: int, player2: int, matches: str) -> Tuple[int, int]:
         """Processes a match in the given ladder database with the given information.

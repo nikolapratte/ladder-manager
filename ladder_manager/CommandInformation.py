@@ -20,6 +20,6 @@ class ReportInformation(CommandInformation):
 
 
 class SetInformation(CommandInformation):
-    def __init__(self, user: discord.User, rating: int) -> None:
-        self.user = user
+    def __init__(self, user_id: int, rating: int) -> None:
+        self.user_id = user_id
         self.rating = rating

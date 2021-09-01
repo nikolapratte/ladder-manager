@@ -123,3 +123,17 @@ def test_history(test_db: LadderDB):
     values = test_db.cur.fetchone()
 
     assert values == (1, 2, 1200, 1200, "111")
+
+
+def test_update(test_db: LadderDB):
+    test_db._create_player(1)
+    test_db.update_player(1, 2000)
+
+    assert test_db.get_player_rating(1) == 2000
+
+
+def test_update_does_not_exist(test_db: LadderDB):
+    test_db._create_player(1)
+    test_db.update_player(2, 2000)
+
+    assert test_db.get_player_rating(2) == 2000

@@ -38,6 +38,9 @@ class ServerDB:
 
     def is_admin(self, guild: int, user: int) -> bool:
         """Checks if user is admin of guild."""
+        assert type(guild) is int
+        assert type(user) is int
+        
         self.cur.execute("SELECT * FROM users WHERE guild=? AND id=?", (guild, user))
         return self.cur.fetchone() is not None
 

@@ -8,4 +8,4 @@ class Command(Enum):
     report = auto()
     set = auto()
     unknown = auto()
-    update_admins = auto()
+    #update_admins = auto()

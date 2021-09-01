@@ -18,8 +18,7 @@ command_names = {
     Command.help: "Help",
     Command.leaderboard: "Leaderboard",
     Command.report: "Report",
-    Command.set: "Set",
-    Command.update_admins: "update_admins"
+    Command.set: "Set"
     }
 
 command_descriptions = {
@@ -27,8 +26,7 @@ command_descriptions = {
     Command.help: "List of commands and short descriptions of what they do.",
     Command.leaderboard: "Shows leaderboard of players",
     Command.report: "Report a match.",
-    Command.set: "Set a player rating.",
-    Command.update_admins: 'Adds all users with "Manage Server" permission to bot\'s admin list.'
+    Command.set: "Set a player rating."
 }
 
 # Mapping between commands and what information they need.
@@ -37,8 +35,7 @@ command_to_information = {
     Command.report: ReportInformation,
     Command.set: SetInformation,
     Command.help: None,
-    Command.leaderboard: None,
-    Command.update_admins: None
+    Command.leaderboard: None
 }
 command_symbol = "!"
 
