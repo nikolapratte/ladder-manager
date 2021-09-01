@@ -34,3 +34,28 @@ def test_admin_add3(test_db: ServerDB):
     test_db.add_admin(1, 1)
     
     assert test_db.is_admin(2, 1) is False
+
+def test_admin_guild_registered_false(test_db: ServerDB):
+    test_db.add_admin(1, 1)
+    
+    assert test_db.is_guild_registered(2) is False
+
+def test_admin_guild_registered_true(test_db: ServerDB):
+    test_db.add_admin(1, 1)
+    
+    assert test_db.is_guild_registered(1) is True
+
+def test_get_admin(test_db: ServerDB):
+    test_db.add_admin(1, 1)
+    test_db.add_admin(2, 2)
+    test_db.add_admin(1, 2)
+    
+    assert test_db.get_admins(1) == (1, 2)
+
+
+def test_get_admin_none(test_db: ServerDB):
+    test_db.add_admin(1, 1)
+    test_db.add_admin(2, 2)
+    test_db.add_admin(1, 2)
+    
+    assert test_db.get_admins(3) == tuple()

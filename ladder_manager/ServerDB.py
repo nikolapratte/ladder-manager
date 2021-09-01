@@ -1,4 +1,5 @@
 import sqlite3
+from typing import List, Tuple
 
 from .constants import server_db_name
 
@@ -26,7 +27,7 @@ class ServerDB:
         self.con.commit()
 
     
-    def add_admin(self, admin: int, guild: int) -> None:
+    def add_admin(self, guild: int, admin: int) -> None:
         """Adds an admin to the database"""
         assert type(admin) is int
         assert type(guild) is int
@@ -43,5 +44,16 @@ class ServerDB:
     
     def is_guild_registered(self, guild: int) -> bool:
         """Checks if the guild has any admins (of this ladder bot)."""
-        self.cur.execute("SELECT * FROM preferences WHERE guild=?", (guild,))
+        assert isinstance(guild, int)
+
+        self.cur.execute("SELECT * FROM users WHERE guild=?", (guild,))
         return self.cur.fetchone() is not None
+
+    
+    def get_admins(self, guild: int) -> List[int]:
+        """Gets the user ids of admins in the given [guild].
+        
+        Returns empty list if there are no admins for the given guild."""
+        self.cur.execute("SELECT id FROM users WHERE guild=?", (guild,))
+        val = self.cur.fetchall()
+        return tuple(info[0] for info in val) if val is not None else tuple()

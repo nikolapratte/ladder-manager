@@ -3,8 +3,9 @@
 File should not contain any extra characters."""
 
 from .Command import Command
-from .CommandInformation import CommandInformation, ReportInformation
+from .CommandInformation import ReportInformation, SetInformation
 
+admin_commands = set([Command.set])
 
 cancel_emoji = "❌"
 
@@ -16,22 +17,28 @@ command_names = {
     Command.cancel: "Cancel",
     Command.help: "Help",
     Command.leaderboard: "Leaderboard",
-    Command.report: "Report"
+    Command.report: "Report",
+    Command.set: "Set",
+    Command.update_admins: "update_admins"
     }
 
 command_descriptions = {
     Command.cancel: "Cancels the current command.",
     Command.help: "List of commands and short descriptions of what they do.",
     Command.leaderboard: "Shows leaderboard of players",
-    Command.report: "Report a match."
+    Command.report: "Report a match.",
+    Command.set: "Set a player rating.",
+    Command.update_admins: 'Adds all users with "Manage Server" permission to bot\'s admin list.'
 }
 
 # Mapping between commands and what information they need.
 # If a command doesn't need extra information, will have None.
 command_to_information = {
     Command.report: ReportInformation,
+    Command.set: SetInformation,
     Command.help: None,
-    Command.leaderboard: None
+    Command.leaderboard: None,
+    Command.update_admins: None
 }
 command_symbol = "!"
 

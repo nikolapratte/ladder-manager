@@ -1,11 +1,12 @@
 from .CommandInformation import CommandInformation, ReportInformation
 import asyncio
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, final
 
 import discord
 
 from .Command import Command
-from .constants import cancel_emoji, command_descriptions, command_names, command_symbol, command_to_information, \
+from .constants import admin_commands, cancel_emoji, command_descriptions, command_names, \
+command_symbol, command_to_information, \
 debug, delete_msgs_after, main_ladder_name, timeout_limit, timeout_message
 from .LadderDB import LadderDB
 from .ServerDB import ServerDB
@@ -43,6 +44,7 @@ class MyClient(discord.Client):
         assert channel is not None
 
         return await channel.send(message, delete_after = delete_after)
+
 
     async def menu(self, message: discord.Message, user_target: discord.User, options: List[str]) -> Optional[str]:
         """Creates a menu out of the given message.
@@ -83,6 +85,7 @@ class MyClient(discord.Client):
 
     async def setup_guild(self, guild: discord.Guild) -> None:
         """Makes users with "Manage Server" permission administrators for the bot."""
+        # TODO unused currently
         # TODO untested
         assert type(guild) is discord.Guild
 
@@ -92,15 +95,51 @@ class MyClient(discord.Client):
             role: discord.Role = role
             if role.permissions.manage_guild:
                 admin_roles.add(role)
+        print(admin_roles)
 
+        # for each member, check their roles and if any are considered an admin role,
+        # add them to admin list
+        print(f"We have members {guild.members}.")
         for member in guild.members:
             member: discord.Member = member
+            print(f"Member {member.display_name} has roles {member.roles}.")
             for role in member.roles:
                 if role in admin_roles:
                     if debug:
                         print(f"Making user {member.display_name} an administrator of guild {guild.name}.")
-                    self.server_db.add_admin(member.id, guild.id)
+                    self.server_db.add_admin(guild.id, member.id)
 
+        print(f"Owner is {guild.owner}.")
+        # add owner
+        if guild.owner:
+            if debug:
+                print(f"Making user {member.display_name} an administrator of guild {guild.name}.")
+            self.server_db.add_admin(guild.id, guild.owner.id)
+
+
+    async def request_info(self, author: int, check: Callable[[discord.Message], bool],
+    invalid_response_msg: str) -> Optional[discord.Message]:
+        """Waits for the given user [author] to type a message that fulfills [check].
+        
+        Returns the message if successful, otherwise returns None.
+        
+        By default, only waits for messages from the author."""
+        def base_check(mention_message: discord.Message) -> bool:
+                        return mention_message.author == author
+
+        # repeat asking for user mentions until user mentions only 1 user.
+        while True:
+            try:
+                msg: discord.Message = await self.wait_for("message", timeout=timeout_limit, check=base_check)
+                if debug:
+                    print(f"Recognizing mention message as: {msg.content}")
+            except asyncio.TimeoutError:
+                return
+            # TODO should also make sure user isn't pinging self, or bots
+            if check(msg):
+                return msg
+            else:
+                await self.send(msg.channel, invalid_response_msg, delete_after = delete_msgs_after)
 
 
     async def run_command(self, ladder_name: str, channel: discord.abc.Messageable,
@@ -120,6 +159,9 @@ class MyClient(discord.Client):
                 output += f"{name}: {command_descriptions[command]}\n"
 
             await self.send(channel, output)
+        elif command is Command.update_admins:
+            await self.setup_guild(channel.guild)
+            await self.send(channel, "Processing update_admins request...", delete_after = delete_msgs_after)
         elif command is Command.leaderboard:
             db = self.get_db(ladder_name)
             output = "LEADERBOARD\n"
@@ -227,37 +269,29 @@ class MyClient(discord.Client):
                     losses = match_history.count("0")
                     await explanation_msg.edit(content = f"{explanation_start}Recorded {wins} wins and {losses} losses. Please ping your opponent.")
 
-                    # wait for response
-                    # check if user reacted with one of the appropriate emojis
-                    def check(mention_message: discord.Message) -> bool:
-                        return mention_message.author == message.author and len(mention_message.mentions) != 0
-
-                    # repeat asking for user mentions until user mentions only 1 user.
-                    while True:
-                        try:
-                            mention_msg: discord.Message = await self.wait_for("message", timeout=timeout_limit, check=check)
-                            if debug:
-                                print(f"Recognizing mention message as: {mention_msg.content}")
-                        except asyncio.TimeoutError:
-                            error = True
-                            break
-                        # TODO should also make sure user isn't pinging self, or bots
-                        if len(mention_msg.mentions) == 1:
-                            opponent = mention_msg.mentions[0]
-                            break
-                        await self.send(mention_msg.channel, "Only mention 1 user.", delete_after = delete_msgs_after)
+                    # TODO untested (bot is False)
+                    val = await self.request_info(message.author,
+                    lambda x: len(x.mentions) == 1 and x.mentions[0] != message.author and x.mentions[0].bot is False, 
+                    "Only mention 1 user, who is not yourself.")
+                    if val is None:
+                        error = True
+                    else:
+                        opponent = val.mentions[0]
                 else:
                     opponent_name = opponent.display_name
                     await explanation_msg.edit(content = f"{explanation_start}{opponent_name} needs to verify match. 👍 to verify, {cancel_emoji} to cancel.", )
 
-                    choice = await self.menu(explanation_msg, mention_msg.mentions[0], ["👍"])
+                    choice = await self.menu(explanation_msg, opponent, ["👍"])
                     if choice is None:
                         error = True
                         continue
 
                     await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
 
-                    return ReportInformation(match_history, message.author, mention_msg.mentions[0])
+                    return ReportInformation(match_history, message.author, opponent)
+        elif command is Command.set:
+            # TODO current
+            pass
 
 
     async def on_ready(self):
@@ -276,11 +310,14 @@ class MyClient(discord.Client):
             await self.process_message_dm(message)
             return
         else:
-            # figure out guild, perform setup if necessary
-            if not self.server_db.is_guild_registered(message.channel.guild):
-                self.setup_guild(message.channel.guild)
+            # add user to admin list if they are an admin
+            # this is an inefficient alternative to just adding users once when added
+            # to a server, but don't want to enable privileged intents right now
+            if message.author.guild_permissions.manage_guild:
+                print(f"Making user [{message.author.display_name}] an administrator of guild [{message.channel.guild.name}].")
+                self.server_db.add_admin(message.channel.guild.id, message.author.id)
 
-            # save guild info, load up necessary info
+            # TODO save guild info, load up necessary info
             command: Command = parse_message(message)
 
         # if no command matched, end
@@ -295,6 +332,10 @@ class MyClient(discord.Client):
             return
         elif command is None:
             await self.send(message.channel, "Sorry, I don't recognize that.", delete_after = delete_msgs_after)
+            return
+        elif command in admin_commands and not self.server_db.is_admin(message.channel.guild.id, message.author.id):
+            await self.send(message.channel, "You must have the 'Manage Server' permission to run that command.", 
+            delete_after = delete_msgs_after)
             return
         else:
             # otherwise, add user to commands list since only one command can be run for a user at a time
