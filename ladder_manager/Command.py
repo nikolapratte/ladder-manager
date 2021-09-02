@@ -3,7 +3,7 @@ from enum import Enum, auto
 class Command(Enum):
     cancel = auto()
     help = auto()
-    leaderboard = auto()
+    board = auto()
     not_a_command = auto()
     report = auto()
     set = auto()

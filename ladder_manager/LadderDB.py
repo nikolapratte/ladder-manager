@@ -95,7 +95,7 @@ class LadderDB:
         return p1final_mmr, p2final_mmr
 
     
-    def leaderboard(self) -> List[Tuple[int, int]]:
+    def board(self) -> List[Tuple[int, int]]:
         """Returns a list of player ids and their rating, with the highest rating players first."""
         self.cur.execute("SELECT id, rating FROM players ORDER BY rating DESC")
         return self.cur.fetchall()

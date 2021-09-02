@@ -1,3 +1,4 @@
+from discord import guild
 from .CommandInformation import CommandInformation, ReportInformation, SetInformation
 import asyncio
 from typing import Callable, List, Optional, Tuple, final
@@ -75,6 +76,16 @@ class MyClient(discord.Client):
             return reaction.emoji
         except asyncio.TimeoutError:
             return
+
+    
+    def get_ladder_name(self, guild_id: int) -> str:
+        """Returns the name of the ladder associated with the given [guild_id]."""
+        assert type(guild_id) is int
+
+        # generate the name
+        name = f"default-{guild_id}.db"
+
+        return name
 
     
     def get_db(self, ladder_name: str) -> LadderDB:
@@ -156,14 +167,16 @@ class MyClient(discord.Client):
         if command is Command.help:
             output = ""
             for command, name in command_names.items():
+                if command in admin_commands:
+                    output += "(admin) "
                 output += f"{name}: {command_descriptions[command]}\n"
 
             await self.send(channel, output)
-        elif command is Command.leaderboard:
+        elif command is Command.board:
             db = self.get_db(ladder_name)
             output = "LEADERBOARD\n"
 
-            board = db.leaderboard()
+            board = db.board()
             for user_id, rating in board:
                 user = await channel.guild.fetch_member(user_id)
                 output += f"{user.display_name}\t{rating}\n"
@@ -398,7 +411,7 @@ class MyClient(discord.Client):
 
         # FUTURE decide where command should go based on guild, settings, channel, etc.
         # load up appropriate database
-        ladder_name = main_ladder_name
+        ladder_name = self.get_ladder_name(message.channel.guild.id)
 
         if command_to_information[command] is not None:
             info: CommandInformation = await self.get_information(command, message)

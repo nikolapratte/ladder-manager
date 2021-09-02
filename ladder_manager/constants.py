@@ -16,7 +16,7 @@ command_alternative_names = {
 command_names = {
     Command.cancel: "Cancel",
     Command.help: "Help",
-    Command.leaderboard: "Leaderboard",
+    Command.board: "board",
     Command.report: "Report",
     Command.set: "Set"
     }
@@ -24,7 +24,7 @@ command_names = {
 command_descriptions = {
     Command.cancel: "Cancels the current command.",
     Command.help: "List of commands and short descriptions of what they do.",
-    Command.leaderboard: "Shows leaderboard of players",
+    Command.board: "Shows board of players",
     Command.report: "Report a match.",
     Command.set: "Set a player rating."
 }
@@ -35,7 +35,7 @@ command_to_information = {
     Command.report: ReportInformation,
     Command.set: SetInformation,
     Command.help: None,
-    Command.leaderboard: None
+    Command.board: None
 }
 command_symbol = "!"
 

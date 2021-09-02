@@ -97,21 +97,21 @@ def test_process_match_simple_save():
     os.remove(test_db_filename)
 
 
-def test_leaderboard(test_db: LadderDB):
+def test_board(test_db: LadderDB):
     test_db._create_player(1)
     test_db._create_player(2)
     p1output, p2output = test_db.process_match(1, 2, "111")
 
-    assert test_db.leaderboard() == [(1, p1output), (2, p2output)]
+    assert test_db.board() == [(1, p1output), (2, p2output)]
 
 
-def test_leaderboard2(test_db: LadderDB):
+def test_board2(test_db: LadderDB):
     test_db._create_player(1)
     test_db._create_player(2)
     test_db._create_player(3)
     p1output, p2output = test_db.process_match(1, 2, "111")
 
-    assert test_db.leaderboard() == [(1, p1output), (3, LadderDB.starting_rating), (2, p2output)]
+    assert test_db.board() == [(1, p1output), (3, LadderDB.starting_rating), (2, p2output)]
 
 
 def test_history(test_db: LadderDB):
