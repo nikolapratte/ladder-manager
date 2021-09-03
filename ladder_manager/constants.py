@@ -3,7 +3,7 @@
 File should not contain any extra characters."""
 
 from .Command import Command
-from .CommandInformation import ReportInformation, SetInformation
+from .CommandInformation import ReportInformation, SetInformation, TeamsInformation
 
 admin_commands = set([Command.set])
 
@@ -18,7 +18,8 @@ command_names = {
     Command.help: "Help",
     Command.board: "board",
     Command.report: "Report",
-    Command.set: "Set"
+    Command.set: "Set",
+    Command.teams: "Teams"
     }
 
 command_descriptions = {
@@ -26,7 +27,8 @@ command_descriptions = {
     Command.help: "List of commands and short descriptions of what they do.",
     Command.board: "Shows board of players",
     Command.report: "Report a match.",
-    Command.set: "Set a player rating."
+    Command.set: "Set a player rating.",
+    Command.teams: "Report a random teams match. Random teams means each player has individual mmr."
 }
 
 # Mapping between commands and what information they need.
@@ -35,7 +37,8 @@ command_to_information = {
     Command.report: ReportInformation,
     Command.set: SetInformation,
     Command.help: None,
-    Command.board: None
+    Command.board: None,
+    Command.teams: TeamsInformation
 }
 command_symbol = "!"
 
@@ -45,7 +48,7 @@ delete_msgs_after = 10
 main_ladder_name = "main_ladder.db"
 
 timeout_message = "Sorry, your session was cancelled or timed out. Please try again."
-timeout_limit = 15
+timeout_limit = 30
 token_filename = "ladder_manager/token.txt"
 
 

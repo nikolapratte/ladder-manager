@@ -1,4 +1,5 @@
 from abc import ABC
+from .constants import Command
 from typing import List
 
 import discord
@@ -23,3 +24,10 @@ class SetInformation(CommandInformation):
     def __init__(self, user_id: int, rating: int) -> None:
         self.user_id = user_id
         self.rating = rating
+
+    
+class TeamsInformation(CommandInformation):
+    def __init__(self, user_team: List[discord.Member], opponent_team: List[discord.Member], matches: str) -> None:
+        self.user_team = user_team
+        self.opponent_team = opponent_team
+        self.matches = matches

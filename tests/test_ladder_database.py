@@ -137,3 +137,19 @@ def test_update_does_not_exist(test_db: LadderDB):
     test_db.update_player(2, 2000)
 
     assert test_db.get_player_rating(2) == 2000
+
+
+def test_teams(test_db: LadderDB):
+    p1output, p2output = test_db.process_team_match([1,2], [3,4], "111")
+
+    delta1 = base_rating_change - (0//inequality_change_rate)
+    delta2 = base_rating_change - ((0 + delta1 * 2)//inequality_change_rate)
+    delta3 = base_rating_change - ((0 + delta1 * 2 + delta2 * 2)//inequality_change_rate)
+    delta = delta1 + delta2 + delta3
+
+    assert p1output == delta
+    assert p2output == -delta
+
+    assert test_db.get_player_rating(1) == LadderDB.starting_rating + delta
+    assert test_db.get_player_rating(4) == LadderDB.starting_rating - delta
+    

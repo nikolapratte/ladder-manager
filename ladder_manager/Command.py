@@ -6,6 +6,7 @@ class Command(Enum):
     board = auto()
     not_a_command = auto()
     report = auto()
+    teams = auto()
     set = auto()
     unknown = auto()
     #update_admins = auto()

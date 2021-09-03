@@ -1,7 +1,8 @@
 from discord import guild
-from .CommandInformation import CommandInformation, ReportInformation, SetInformation
+from .CommandInformation import CommandInformation, ReportInformation, SetInformation, TeamsInformation
 import asyncio
-from typing import Callable, List, Optional, Tuple, final
+import random
+from typing import Callable, List, Optional, Tuple
 
 import discord
 
@@ -152,6 +153,46 @@ class MyClient(discord.Client):
             else:
                 await self.send(msg.channel, invalid_response_msg, delete_after = delete_msgs_after)
 
+    async def request_matches(self, author: int, channel: discord.abc.Messageable,
+    explanation_msg: discord.Message) -> Optional[str]:
+        """Requests win/loss of matches played from the given author.
+        
+        Returns None if an issue occurred."""
+        error = False
+        matches = ""
+        game_score_msgs = list()
+
+        await explanation_msg.edit(content = "Click on 👍 to report a win and 👎 to report a loss. Click 🆗 when you are done. Wait until all the reactions are added to click.")
+
+        while True:
+            game_score_msg: discord.Message = await self.send(channel, f"Who won game {len(matches) + 1}?")
+            game_score_msgs.append(game_score_msg)
+
+            choice = await self.menu(game_score_msg, author, ["👍", "👎", "🆗"])
+            
+            if choice is None:
+                error = True
+                break
+
+            if choice == "👍":
+                matches += "1"
+            elif choice == "👎":
+                matches += "0"
+            elif choice == "🆗":
+                break
+        if debug:
+            print(f"Match history recorded as: {matches}.")
+        if matches == "":
+            error = True
+
+        await explanation_msg.edit(content = "Processing...")
+
+        # clean up messages to avoid spam
+        for bot_message in game_score_msgs:
+            await bot_message.delete()
+
+        return None if error else matches
+
 
     async def run_command(self, ladder_name: str, channel: discord.abc.Messageable,
      command: Command, info: CommandInformation = None) -> None:
@@ -166,10 +207,16 @@ class MyClient(discord.Client):
 
         if command is Command.help:
             output = ""
+            delayed_cmds = ""
             for command, name in command_names.items():
+                tmp = f"{name}: {command_descriptions[command]}\n"
+
                 if command in admin_commands:
-                    output += "(admin) "
-                output += f"{name}: {command_descriptions[command]}\n"
+                    delayed_cmds += "(admin) " + tmp
+                else:
+                    output += tmp
+
+            output += delayed_cmds
 
             await self.send(channel, output)
         elif command is Command.board:
@@ -190,6 +237,33 @@ class MyClient(discord.Client):
             db.update_player(info.user_id, info.rating)
 
             await self.send(channel, "Updated player rating.")
+        elif command is Command.teams:
+            assert info is not None
+            info: TeamsInformation = info
+
+            assert type(info.matches) is str
+
+            db = self.get_db(ladder_name)
+
+            # backend
+            user_team_starting_mmr = [db.get_player_rating(user.id) if db.player_exists(user.id) else LadderDB.starting_rating for user in info.user_team]
+            opponent_team_starting_mmr = [db.get_player_rating(user.id) if db.player_exists(user.id) else LadderDB.starting_rating for user in info.opponent_team]
+
+            p1_delta, p2_delta = db.process_team_match([user.id for user in info.user_team], [user.id for user in info.opponent_team], info.matches)
+
+            user_final = [rating + p1_delta for rating in user_team_starting_mmr]
+            opp_final = [rating + p2_delta for rating in opponent_team_starting_mmr]
+
+            output = f"New ratings\n"
+            for user, start_mmr, end_mmr in zip(info.user_team, user_team_starting_mmr, user_final):
+                output += f"{user.display_name}: {start_mmr} -> {end_mmr}\n"
+            output += "\n"
+            for user, start_mmr, end_mmr in zip(info.opponent_team, opponent_team_starting_mmr, opp_final):
+                output += f"{user.display_name}: {start_mmr} -> {end_mmr}\n"
+
+            await self.send(channel, output)
+
+
         elif command is Command.report:
             if info is None:
                 raise ValueError("[info] should not be None for a command that requires [info].")
@@ -275,18 +349,83 @@ class MyClient(discord.Client):
                     if debug:
                         print(f"Sending user id: {user_target} with rating {rating}.")
                     return SetInformation(user_id = user_target, rating = rating)
+        elif command is Command.teams:
+            # state
+            matches = ""
+            error = False
+            user_team = [message.author]
+            opponent_team = list()
+            ### end state variables
+
+            explanation_start = f"{command_names[Command.teams]} for {message.author.display_name}: "
+            explanation_msg = await self.send(channel, "Processing...")
+
+            while True:
+                if error:
+                    await explanation_msg.delete()
+                    await self.send(message.channel, timeout_message)
+                    return
+                elif matches == "":
+                    matches = await self.request_matches(message.author, channel, explanation_msg)
+                    if matches is None:
+                        error = True
+                elif len(user_team) <= 1:
+                    wins = matches.count("1")
+                    losses = matches.count("0")
+                    await explanation_msg.edit(content = f"{explanation_start}Recorded {wins} wins and {losses} losses. Please ping your teammates in one message.")
+
+                    val = await self.request_info(message.author,
+                    lambda x: True, 
+                    "Do not mention yourself or any bots.")
+                    if val is None:
+                        error = True
+                    else:
+                        # lazy way of filtering out author
+                        user_team = list(set(user_team + val.mentions))
+                elif len(opponent_team) <= 0:
+                    wins = matches.count("1")
+                    losses = matches.count("0")
+                    await explanation_msg.edit(content = f"{explanation_start}Please ping your opponents in one message.")
+
+                    val = await self.request_info(message.author,
+                lambda x: True, 
+                "Do not mention any bots.")
+                    if val is None:
+                        error = True
+                        continue
+                    else:
+                        opponent_team = val.mentions
+
+                        # troll checks
+                        teams_exclusive = len(set(user_team + opponent_team)) == len(user_team + opponent_team)
+
+                        if not teams_exclusive:
+                            error = True
+                            continue
+
+                        # TODO more robust verification?
+                        # verification, return
+                        opponent_verifier = random.choice(opponent_team)
+
+                        await explanation_msg.edit(content = f"{explanation_start}<@!{opponent_verifier.id}> needs to verify match. 👍 to verify, {cancel_emoji} to cancel.", )
+
+                        choice = await self.menu(explanation_msg, opponent_verifier, ["👍"])
+                        if choice is None:
+                            error = True
+                            continue
+
+                        await explanation_msg.edit(content = "Match processing...", delete_after = delete_msgs_after)
+
+                        return TeamsInformation(user_team, opponent_team, matches)
+
         elif command is Command.report:
             ### state variables
 
             # for match history, "1" means win for the author, "0" means loss for the author
-            # left most refers to most recent
+            # left most refers to most recent (edit: actually probably doesn't)
             match_history = ""
             error = False
-            game_score_cleanup = False
             opponent = None
-
-            # list of game score messages (need for id to delete later on)
-            game_score_msgs = list()
 
             ### end state variables
 
@@ -297,42 +436,14 @@ class MyClient(discord.Client):
             # start of declarative style. Using this for the "UI" portion of the bot,
             # to make debugging simpler
             while True:
-                if game_score_cleanup:
-                    await explanation_msg.edit(content = f"{explanation_start}Processing...")
-                    # clean up messages to avoid spam
-                    for bot_message in game_score_msgs:
-                        await bot_message.delete()
-                    game_score_cleanup = False
-                elif error:
+                if error:
                     await explanation_msg.delete()
                     await self.send(message.channel, timeout_message)
                     return
                 elif match_history == "":
-                    await explanation_msg.edit(content = f"{explanation_start}Click on 👍 to report a win and 👎 to report a loss. Click 🆗 when you are done.")
-
-                    # put out messages and reactions on them so user can just click the reactions
-                    while True:
-                        game_score_msg: discord.Message = await self.send(channel, f"Who won game {len(match_history) + 1}?")
-                        game_score_msgs.append(game_score_msg)
-
-                        choice = await self.menu(game_score_msg, message.author, ["👍", "👎", "🆗"])
-                        
-                        if choice is None:
-                            error = True
-                            game_score_cleanup = True
-                            break
-
-                        if choice == "👍":
-                            match_history += "1"
-                        elif choice == "👎":
-                            match_history += "0"
-                        elif choice == "🆗":
-                            break
-                    if debug:
-                        print(f"Match history recorded as: {match_history}.")
-                    if match_history == "":
+                    match_history = await self.request_matches(message.author, channel, explanation_msg)
+                    if match_history is None:
                         error = True
-                    game_score_cleanup = True
                 elif opponent is None:
                     # move on to asking user about opponent
                     wins = match_history.count("1")

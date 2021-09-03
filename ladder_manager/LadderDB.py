@@ -28,6 +28,8 @@ class LadderDB:
                             (id integer, rating integer)""")
             self.cur.execute(f"""CREATE TABLE history
             (p1 integer, p2 integer, p1rating integer, p2rating integer, matches text)""")
+            self.cur.execute(f"""CREATE TABLE team_history
+            (p1 text, p2 text, p1rating integer, p2rating integer, matches text)""")
 
         self.con.commit()
 
@@ -93,6 +95,45 @@ class LadderDB:
         self.con.commit()
 
         return p1final_mmr, p2final_mmr
+
+    
+    def process_team_match(self, p1_team: List[int], p2_team: List[int], matches: str) -> Tuple[int, int]:
+        """Processes a random teams match. See [LadderDB.process_match] for more information.
+        
+        Return: Tuple[p1_mmr_delta, p2_mmr_delta]"""
+        for user_id in p1_team + p2_team:
+            assert type(user_id) is int
+            
+        for player in p1_team + p2_team:
+            self._prepare_player(player)
+        
+        p1_starting_mmr = [self.get_player_rating(user_id) for user_id in p1_team]
+        p2_starting_mmr = [self.get_player_rating(user_id) for user_id in p2_team]
+
+        
+
+        p1_avg = sum(p1_starting_mmr)//len(p1_team)
+        p2_avg = sum(p2_starting_mmr)//len(p2_team)
+
+        p1_team_stored = ";".join([str(user) for user in p1_team])
+        p2_team_stored = ";".join([str(user) for user in p2_team])
+        self.cur.execute("INSERT INTO team_history VALUES (?, ?, ?, ?, ?)", (p1_team_stored, p2_team_stored, p1_avg, p2_avg, matches))
+
+        p1sum_final, p2sum_final = calculate_ratings(p1_avg, p2_avg, matches)
+
+        p1_delta = p1sum_final - p1_avg
+        p2_delta = p2sum_final - p2_avg
+
+        for player, rating in zip(p1_team, p1_starting_mmr):
+            rating += p1_delta
+            self.cur.execute("UPDATE players SET rating = ? WHERE id = ?", (rating, player))
+
+        for player, rating in zip(p2_team, p2_starting_mmr):
+            rating += p2_delta
+            self.cur.execute("UPDATE players SET rating = ? WHERE id = ?", (rating, player))
+        self.con.commit()
+
+        return p1_delta, p2_delta
 
     
     def board(self) -> List[Tuple[int, int]]:
